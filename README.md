@@ -1,5 +1,7 @@
 # Sway Tree Visualizer
 
+![Sway Tree Viewer Screenshot](docs/screenshot-window.png)
+
 A Python application that visualizes the Sway window manager layout tree in real-time. It uses GTK3 for the interface and `i3ipc` to communicate with Sway.
 
 ## Requirements
@@ -13,34 +15,29 @@ All three are typically installed by default if you're using Sway.
 ## Installation
 
 1.  Clone the repository:
-    ```python
-    git clone https://github.com/yourusername/swaytreeviewer.git
+    ```bash
+    git clone https://github.com/rashidalnaemi/swaytreeviewer.git
     cd swaytreeviewer
     ```
 
 You might face some dependency errors which require you to run `pip install -r requirements.txt` but that is unlikely as the only two dependencies are i3ipc and PyGObject which are installed by default when using SwayWM.
 
 
-Pip installation coming soon.
+Pip installation coming soon (maybe. if anyone wants it)
 
 ## Usage
 
 You start the application by running main.py
 
-```
+
+```bash
+# Appears as a standard window within your tiling manager.
 python3 main.py
 
-# OR
 
+# A transparent floating window that appear on top of your tiled windows
 python3 main.py --mode transparent
 ```
-
-
-The first option launches it as a standard window within sway's tiling. 
-
-![Sway Tree Viewer Screenshot](docs/screenshot-window.png)
-
-The second option launches it as a transparent overlay over your screen.
 
 The application has a built-in "Toggle" feature:
 1.  **Does Not Steal Focus:** When launched, it appears without taking focus, allowing you to keep focus on your regular windows and moving them.
@@ -52,6 +49,7 @@ Add this line to your Sway config (e.g., `~/.config/sway/config`):
 # Toggle SwayTreeViewer with Mod+t
 bindsym $mod+t exec python3 /path/to/swaytreeviewer/main.py --mode transparent
 ```
+
 
 ## Command Line Options
 
@@ -72,12 +70,12 @@ Controls how the application window is displayed.
 **Examples:**
 
 Run in floating mode (default):
-```python
+```bash
 python3 main.py --mode window
 ```
 
 Run as a transparent overlay:
-```python
+```bash
 python3 main.py --mode transparent
 ```
 
@@ -90,7 +88,7 @@ Controls whether floating windows are included in the visualization. By default,
 
 **Example:**
 
-```python
+```bash
 python3 main.py --include-floating
 ```
 
@@ -105,7 +103,7 @@ Sets the opacity of the visualization elements (backgrounds, borders, text). Thi
 **Example:**
 
 Run with 10% opacity:
-```python
+```bash
 python3 main.py --mode transparent --alpha 0.1
 ```
 
@@ -116,25 +114,28 @@ Sets the initial dimensions of the window. You can specify the size in **pixels*
 *   **Syntax:** `python3 main.py --width <VALUE> --height <VALUE>`
 *   **Value:** An integer (pixels) or a string ending in `%` (percentage).
 *   **Defaults:**
-    *   Width: `500` (pixels)
-    *   Height: `400` (pixels)
+    *   Width: `100%`
+    *   Height: `100%`
 
 **Examples:**
 
 Set specific pixel dimensions:
-```python
-python3 main.py --width 800 --height 600
+```bash
+python3 main.py --mode transparent --width 800 --height 600
 ```
 
 Set dimensions relative to screen size:
-```python
-python3 main.py --width 50% --height 50%
+```bash
+python3 main.py --mode transparent --width 50% --height 50%
 ```
 
 Mix pixels and percentages:
-```python
-python3 main.py --width 100% --height 300
+```bash
+python3 main.py --mode transparent --width 100% --height 300
 ```
+
+
+Windowed mode ignores width and height settings as these are managed by sway.
 
 ## Troubleshooting
 
