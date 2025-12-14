@@ -1,5 +1,6 @@
 import argparse
 import sys
+import os
 import signal
 import gi
 import i3ipc
@@ -19,25 +20,19 @@ def main():
                         help="Include floating windows in the visualization")
     args = parser.parse_args()
 
+    # For transparent mode, set up floating rule before creating window
+    # This ensures it starts floating immediately (no tiling flicker)
+    if args.mode == "transparent":
+        try:
+            conn = i3ipc.Connection()
+            conn.command(f'for_window [pid={os.getpid()}] floating enable')
+        except Exception as e:
+            print(f"Failed to set floating rule via IPC: {e}")
+
     # Create and configure the main application window
     app = TreeVisualizer(mode=args.mode, include_floating=args.include_floating)
     app.connect("destroy", Gtk.main_quit)  # Handle window close event
     app.show_all()  # Make all widgets visible
-
-    # For transparent mode, force the window to be floating in Sway
-    # This ensures proper positioning and behavior
-    if args.mode == "transparent":
-        def force_floating():
-            """Force window to be floating via Sway IPC command."""
-            try:
-                conn = i3ipc.Connection()
-                conn.command('[title="SwayTreeViewer"] floating enable')
-            except Exception as e:
-                print(f"Failed to force floating via IPC: {e}")
-            return False  # Don't repeat this timeout
-
-        # Delay the floating enforcement to ensure window is created first
-        GLib.timeout_add(200, force_floating)
 
     def update_ui(tree, focused_ws_name):
         """Update the GUI with new tree data from the main GTK thread."""

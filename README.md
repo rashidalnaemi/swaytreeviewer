@@ -50,9 +50,7 @@ Controls how the application window is displayed.
 **Available Modes:**
 
 *   `window`: Standard GTK window. Managed like any other tiled window in Sway.
-*   `floating`: Opens as a floating window. Useful if you want to keep it above other tiled windows.
 *   `transparent`: Opens as a floating, semi-transparent window. Good for overlay usage.
-*   `fullscreen-transparent`: Opens as a fullscreen, semi-transparent overlay.
 
 **Examples:**
 
