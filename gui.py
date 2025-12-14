@@ -8,12 +8,15 @@ PAD = 5
 HEADER_H = 20
 
 class TreeVisualizer(Gtk.Window):
-    def __init__(self, mode="window", include_floating=False):
+    def __init__(self, mode="window", include_floating=False, alpha=0.5, width="100%", height="100%"):
         super().__init__(title="SwayTreeViewer")
         self.mode = mode
         self.include_floating = include_floating
+        self.alpha = alpha
         
-        self.set_default_size(500, 400)
+        # Calculate actual dimensions
+        final_w, final_h = self._calculate_dimensions(width, height)
+        self.set_default_size(final_w, final_h)
         self.set_keep_above(True) # Keep window on top
         
         # Mode Configuration
@@ -38,6 +41,25 @@ class TreeVisualizer(Gtk.Window):
         
         self.current_tree = None
         self.focused_workspace_name = None
+
+    def _calculate_dimensions(self, w_str, h_str):
+        """Parse width/height strings (pixels or percentage) and return pixels."""
+        screen = self.get_screen()
+        monitor_w = screen.get_width()
+        monitor_h = screen.get_height()
+
+        def parse_dim(dim_str, max_dim):
+            try:
+                dim_str = str(dim_str).strip()
+                if dim_str.endswith("%"):
+                    pct = float(dim_str[:-1])
+                    return int(max_dim * (pct / 100.0))
+                else:
+                    return int(dim_str)
+            except ValueError:
+                return 500 if max_dim == monitor_w else 400
+
+        return parse_dim(w_str, monitor_w), parse_dim(h_str, monitor_h)
 
     def update_tree(self, tree, focused_ws_name):
         self.current_tree = tree
@@ -148,14 +170,15 @@ class TreeVisualizer(Gtk.Window):
         # Colors (Polished)
         border_color = (0.3, 0.3, 0.3)
         border_width = 1
-        bg_color = (0.1, 0.1, 0.1, 1.0) # Dark background for containers
+        # Apply alpha to background colors
+        bg_color = (0.1, 0.1, 0.1, 1.0 * self.alpha) # Dark background for containers
 
         if node.focused:
             border_color = (0.3, 0.7, 1.0) # Soft Blue
             border_width = 2
-            bg_color = (0.1, 0.2, 0.3, 1.0) # Dark Blue tint
+            bg_color = (0.1, 0.2, 0.3, 1.0 * self.alpha) # Dark Blue tint
         elif is_leaf:
-            bg_color = (0.18, 0.18, 0.18, 1.0) # Slightly lighter for windows
+            bg_color = (0.18, 0.18, 0.18, 1.0 * self.alpha) # Slightly lighter for windows
 
         # 1. Draw Background (Bottom Layer)
         ctx.save()
@@ -198,7 +221,7 @@ class TreeVisualizer(Gtk.Window):
             # Center vertically in the header strip
             ctx.move_to(x + 4, y + (header_h / 2) + 4) 
             
-            ctx.set_source_rgb(*text_color)
+            ctx.set_source_rgba(*text_color, self.alpha)
             ctx.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
             ctx.set_font_size(min(10, header_h - 2))
             ctx.show_text(label)
@@ -278,7 +301,7 @@ class TreeVisualizer(Gtk.Window):
                                     # Highlight Active Tab
                                     ctx.save()
                                     ctx.rectangle(tx, ty, tw, th)
-                                    ctx.set_source_rgb(0.2, 0.6, 1.0) # Blue
+                                    ctx.set_source_rgba(0.2, 0.6, 1.0, self.alpha) # Blue
                                     ctx.fill()
                                     # Add label explicitly? No, draw_node_recursive below will handle frame/label if we call it.
                                     # But we want to draw the BODY primarily.
@@ -329,7 +352,7 @@ class TreeVisualizer(Gtk.Window):
         # 4. Draw Border (Top Layer - Ensures Focus is Visible)
         ctx.save()
         ctx.rectangle(x, y, w, h)
-        ctx.set_source_rgb(*border_color)
+        ctx.set_source_rgba(*border_color, self.alpha)
         ctx.set_line_width(border_width)
         ctx.stroke()
         ctx.restore()

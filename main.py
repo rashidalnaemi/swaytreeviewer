@@ -18,7 +18,21 @@ def main():
                         default="window", help="Display mode")
     parser.add_argument("--include-floating", action="store_true",
                         help="Include floating windows in the visualization")
+    parser.add_argument("--alpha", type=float, default=None,
+                        help="Opacity of the visualization (0.0 - 1.0). Useful for transparent mode.")
+    parser.add_argument("--width", type=str, default=None,
+                        help="Initial width of the window (pixels or %%)")
+    parser.add_argument("--height", type=str, default=None,
+                        help="Initial height of the window (pixels or %%)")
     args = parser.parse_args()
+
+    # Set defaults based on mode if not provided
+    if args.width is None:
+        args.width = "100%" if args.mode == "transparent" else "500"
+    if args.height is None:
+        args.height = "100%" if args.mode == "transparent" else "400"
+    if args.alpha is None:
+        args.alpha = 0.5 if args.mode == "transparent" else 1.0
 
     # For transparent mode, set up floating rule before creating window
     # This ensures it starts floating immediately (no tiling flicker)
@@ -30,7 +44,7 @@ def main():
             print(f"Failed to set floating rule via IPC: {e}")
 
     # Create and configure the main application window
-    app = TreeVisualizer(mode=args.mode, include_floating=args.include_floating)
+    app = TreeVisualizer(mode=args.mode, include_floating=args.include_floating, alpha=args.alpha, width=args.width, height=args.height)
     app.connect("destroy", Gtk.main_quit)  # Handle window close event
     app.show_all()  # Make all widgets visible
 

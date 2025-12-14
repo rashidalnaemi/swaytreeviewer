@@ -11,29 +11,20 @@ A Python application that visualizes the Sway window manager layout tree in real
 ## Installation
 
 1.  Clone the repository:
-    ```bash
+    ```python
     git clone https://github.com/yourusername/swaytreeviewer.git
     cd swaytreeviewer
     ```
 
-2.  Install the required Python packages:
-    ```bash
-    pip install -r requirements.txt
-    ```
+You might face some dependency errors which require you to run `pip install -r requirements.txt` but that is unlikely as the only two dependencies are i3ipc and PyGObject which are installed by default when using SwayWM.
+
 
 ## Usage
 
-You can start the application using the provided `run.sh` script:
+You can start the application by running main.py
 
-```bash
-./run.sh
 ```
-
-Alternatively, if you prefer to run it manually with Python, make sure to set the `PYTHONPATH`:
-
-```bash
-export PYTHONPATH=$PYTHONPATH:$(pwd)/src
-python3 src/main.py
+python3 main.py
 ```
 
 ## Command Line Options
@@ -44,7 +35,7 @@ The application supports different display modes to suit your workflow.
 
 Controls how the application window is displayed.
 
-*   **Syntax:** `./run.sh --mode <MODE>`
+*   **Syntax:** `python3 --mode <MODE>`
 *   **Default:** `window`
 
 **Available Modes:**
@@ -55,28 +46,70 @@ Controls how the application window is displayed.
 **Examples:**
 
 Run in floating mode:
-```bash
-./run.sh --mode floating
+```python
+python3 main.py --mode floating
 ```
 
 Run as a transparent overlay:
-```bash
-./run.sh --mode transparent
+```python
+python3 main.py --mode transparent
 ```
 
 ### `--include-floating`
 
 Controls whether floating windows are included in the visualization. By default, they are ignored to focus on the tiling layout.
 
-*   **Syntax:** `./run.sh --include-floating`
+*   **Syntax:** `python3 main.py --include-floating`
 *   **Default:** Disabled (Floating windows are ignored)
 
 **Example:**
 
-```bash
-./run.sh --include-floating
+```python
+python3 main.py --include-floating
+```
+
+### `--alpha`
+
+Sets the opacity of the visualization elements (backgrounds, borders, text). This is particularly effective when combined with `transparent` mode.
+
+*   **Syntax:** `python3 main.py --alpha <VALUE>`
+*   **Value:** A float between `0.0` (fully transparent) and `1.0` (fully opaque).
+*   **Default:** `1.0`
+
+**Example:**
+
+Run with 50% opacity:
+```python
+python3 main.py --mode transparent --alpha 0.5
+```
+
+### `--width` and `--height`
+
+Sets the initial dimensions of the window. You can specify the size in **pixels** or as a **percentage** of the screen size.
+
+*   **Syntax:** `python3 main.py --width <VALUE> --height <VALUE>`
+*   **Value:** An integer (pixels) or a string ending in `%` (percentage).
+*   **Defaults:**
+    *   Width: `500` (pixels)
+    *   Height: `400` (pixels)
+
+**Examples:**
+
+Set specific pixel dimensions:
+```python
+python3 main.py --width 800 --height 600
+```
+
+Set dimensions relative to screen size:
+```python
+python3 main.py --width 50% --height 50%
+```
+
+Mix pixels and percentages:
+```python
+python3 main.py --width 100% --height 300
 ```
 
 ## Troubleshooting
 
-If the window does not float automatically in `floating` or `transparent` modes, ensure that your Sway configuration allows the application to control its own window state, or manually toggle floating mode using your Sway keybindings.
+If the window does not float automatically in `transparent` modes, ensure that your Sway configuration allows the application to control its own window state, or manually toggle floating mode using your Sway keybindings.
