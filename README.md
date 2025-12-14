@@ -66,6 +66,19 @@ Run as a transparent overlay:
 ./run.sh --mode transparent
 ```
 
+### `--include-floating`
+
+Controls whether floating windows are included in the visualization. By default, they are ignored to focus on the tiling layout.
+
+*   **Syntax:** `./run.sh --include-floating`
+*   **Default:** Disabled (Floating windows are ignored)
+
+**Example:**
+
+```bash
+./run.sh --include-floating
+```
+
 ## Troubleshooting
 
 If the window does not float automatically in `floating` or `transparent` modes, ensure that your Sway configuration allows the application to control its own window state, or manually toggle floating mode using your Sway keybindings.

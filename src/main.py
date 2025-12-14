@@ -13,18 +13,20 @@ def main():
     """Main entry point for the Sway Tree Visualizer application."""
     # Parse command line arguments for display mode
     parser = argparse.ArgumentParser(description="Sway Tree Visualizer")
-    parser.add_argument("--mode", choices=["window", "floating", "transparent", "fullscreen-transparent"], 
+    parser.add_argument("--mode", choices=["window", "transparent"],
                         default="window", help="Display mode")
+    parser.add_argument("--include-floating", action="store_true",
+                        help="Include floating windows in the visualization")
     args = parser.parse_args()
 
     # Create and configure the main application window
-    app = TreeVisualizer(mode=args.mode)
+    app = TreeVisualizer(mode=args.mode, include_floating=args.include_floating)
     app.connect("destroy", Gtk.main_quit)  # Handle window close event
     app.show_all()  # Make all widgets visible
 
-    # For floating/transparent modes, force the window to be floating in Sway
+    # For transparent mode, force the window to be floating in Sway
     # This ensures proper positioning and behavior
-    if args.mode in ["floating", "transparent"]:
+    if args.mode == "transparent":
         def force_floating():
             """Force window to be floating via Sway IPC command."""
             try:

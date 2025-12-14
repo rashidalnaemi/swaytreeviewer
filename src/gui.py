@@ -8,15 +8,16 @@ PAD = 5
 HEADER_H = 20
 
 class TreeVisualizer(Gtk.Window):
-    def __init__(self, mode="window"):
+    def __init__(self, mode="window", include_floating=False):
         super().__init__(title="SwayTreeViewer")
         self.mode = mode
+        self.include_floating = include_floating
         
         self.set_default_size(500, 400)
         self.set_keep_above(True) # Keep window on top
         
         # Mode Configuration
-        if self.mode in ["transparent", "fullscreen-transparent"]:
+        if self.mode == "transparent":
             # Enable transparency
             screen = self.get_screen()
             visual = screen.get_rgba_visual()
@@ -24,15 +25,12 @@ class TreeVisualizer(Gtk.Window):
                 self.set_visual(visual)
                 self.set_app_paintable(True)
 
-        if self.mode != "window":
+        if self.mode == "transparent":
             # Remove decorations (title bar, borders)
             self.set_decorated(False)
-            
-        if self.mode == "fullscreen-transparent":
-            self.fullscreen()
-        else:
-             # Make the window floating and sticky via hints (for utility windows)
-             self.set_type_hint(Gdk.WindowTypeHint.UTILITY)
+
+        # Make the window floating and sticky via hints (for utility windows)
+        self.set_type_hint(Gdk.WindowTypeHint.UTILITY)
         
         self.drawing_area = Gtk.DrawingArea()
         self.drawing_area.connect("draw", self.on_draw)
@@ -49,7 +47,12 @@ class TreeVisualizer(Gtk.Window):
     def find_node_by_name(self, node, name):
         if node.name == name and node.type == 'workspace':
             return node
-        for child in node.nodes + node.floating_nodes:
+        
+        children = node.nodes
+        if self.include_floating:
+            children = children + node.floating_nodes
+
+        for child in children:
             res = self.find_node_by_name(child, name)
             if res: return res
         return None
@@ -57,7 +60,12 @@ class TreeVisualizer(Gtk.Window):
     def get_node_path(self, root, target_id):
         if root.id == target_id:
             return [root]
-        for child in root.nodes + root.floating_nodes:
+        
+        children = root.nodes
+        if self.include_floating:
+            children = children + root.floating_nodes
+
+        for child in children:
             path = self.get_node_path(child, target_id)
             if path:
                 return [root] + path
@@ -65,7 +73,7 @@ class TreeVisualizer(Gtk.Window):
 
     def on_draw(self, widget, ctx):
         # 1. Clear/Draw Window Background
-        if self.mode in ["transparent", "fullscreen-transparent"]:
+        if self.mode == "transparent":
             # Clear background fully for transparency
             ctx.set_source_rgba(0, 0, 0, 0)
             ctx.set_operator(cairo.OPERATOR_SOURCE)
@@ -310,16 +318,13 @@ class TreeVisualizer(Gtk.Window):
                                     self.draw_node_recursive(ctx, child, cx, curr_y, cw, h_h)
                                     curr_y += h_h
 
-            # Floating nodes (on top of children but under border?) 
-            # Actually floating nodes should be on top of everything usually.
-            # But strictly they are children of the container. 
-            # Drawing them here means they are "inside" the container border.
-            for child in node.floating_nodes:
-                fw = w * 0.5
-                fh = h * 0.5
-                fx = x + (w - fw) / 2
-                fy = y + (h - fh) / 2
-                self.draw_node_recursive(ctx, child, fx, fy, fw, fh)
+            if self.include_floating:
+                for child in node.floating_nodes:
+                    fw = w * 0.5
+                    fh = h * 0.5
+                    fx = x + (w - fw) / 2
+                    fy = y + (h - fh) / 2
+                    self.draw_node_recursive(ctx, child, fx, fy, fw, fh)
 
         # 4. Draw Border (Top Layer - Ensures Focus is Visible)
         ctx.save()
