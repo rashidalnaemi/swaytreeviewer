@@ -3,14 +3,36 @@ gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, Gdk, GLib
 import cairo
 
+# Layout Constants
+PAD = 5
+HEADER_H = 20
+
 class TreeVisualizer(Gtk.Window):
-    def __init__(self):
+    def __init__(self, mode="window"):
         super().__init__(title="SwayTreeViewer")
-        self.set_default_size(400, 300)
+        self.mode = mode
+        
+        self.set_default_size(500, 400)
         self.set_keep_above(True) # Keep window on top
         
-        # Make the window floating and sticky via hints (Sway config might still be needed)
-        self.set_type_hint(Gdk.WindowTypeHint.UTILITY)
+        # Mode Configuration
+        if self.mode in ["transparent", "fullscreen-transparent"]:
+            # Enable transparency
+            screen = self.get_screen()
+            visual = screen.get_rgba_visual()
+            if visual and screen.is_composited():
+                self.set_visual(visual)
+                self.set_app_paintable(True)
+
+        if self.mode != "window":
+            # Remove decorations (title bar, borders)
+            self.set_decorated(False)
+            
+        if self.mode == "fullscreen-transparent":
+            self.fullscreen()
+        else:
+             # Make the window floating and sticky via hints (for utility windows)
+             self.set_type_hint(Gdk.WindowTypeHint.UTILITY)
         
         self.drawing_area = Gtk.DrawingArea()
         self.drawing_area.connect("draw", self.on_draw)
@@ -22,55 +44,7 @@ class TreeVisualizer(Gtk.Window):
     def update_tree(self, tree, focused_ws_name):
         self.current_tree = tree
         self.focused_workspace_name = focused_ws_name
-        # Schedule redraw on main thread
         self.queue_draw()
-
-    def on_draw(self, widget, ctx):
-        if not self.current_tree or not self.focused_workspace_name:
-            # Draw placeholder or clear
-            ctx.set_source_rgb(0.1, 0.1, 0.1)
-            ctx.paint()
-            return
-
-        # Find the active workspace node
-        ws_node = None
-        for output in self.current_tree.nodes:
-             # Iterate to find content container, then workspaces
-             if output.name == '__i3': continue
-             for container in output.nodes: # content, dockarea...
-                 if container.type == 'con': # Sometimes workspace is direct child? Depends on i3ipc version vs sway version.
-                     # Traverse to find workspace
-                     pass
-        
-        # Easier search: recursive find
-        ws_node = self.find_node_by_name(self.current_tree, self.focused_workspace_name)
-
-        if ws_node:
-            # Background
-            ctx.set_source_rgb(0.15, 0.15, 0.15)
-            ctx.paint()
-            
-            # Calculate scaling
-            w_width = widget.get_allocated_width()
-            w_height = widget.get_allocated_height()
-            
-            # Workspace rect
-            ws_rect = ws_node.rect
-            
-            scale_x = w_width / ws_rect.width if ws_rect.width else 1
-            scale_y = w_height / ws_rect.height if ws_rect.height else 1
-            scale = min(scale_x, scale_y) * 0.9 # 90% fill to leave margin
-            
-            offset_x = (w_width - (ws_rect.width * scale)) / 2
-            offset_y = (w_height - (ws_rect.height * scale)) / 2
-            
-            ctx.translate(offset_x, offset_y)
-            ctx.scale(scale, scale)
-            
-            # Reset origin relative to workspace for easier drawing
-            ctx.translate(-ws_rect.x, -ws_rect.y)
-
-            self.draw_node(ctx, ws_node)
 
     def find_node_by_name(self, node, name):
         if node.name == name and node.type == 'workspace':
@@ -80,62 +54,277 @@ class TreeVisualizer(Gtk.Window):
             if res: return res
         return None
 
-    def draw_node(self, ctx, node):
-        # Draw current node
-        r = node.rect
-        
-        # Skip workspace node background itself (or draw it as container)
+    def get_node_path(self, root, target_id):
+        if root.id == target_id:
+            return [root]
+        for child in root.nodes + root.floating_nodes:
+            path = self.get_node_path(child, target_id)
+            if path:
+                return [root] + path
+        return None
+
+    def on_draw(self, widget, ctx):
+        # 1. Clear/Draw Window Background
+        if self.mode in ["transparent", "fullscreen-transparent"]:
+            # Clear background fully for transparency
+            ctx.set_source_rgba(0, 0, 0, 0)
+            ctx.set_operator(cairo.OPERATOR_SOURCE)
+            ctx.paint()
+            ctx.set_operator(cairo.OPERATOR_OVER)
+        else:
+            # Standard dark background
+            ctx.set_source_rgb(0.15, 0.15, 0.15)
+            ctx.paint()
+
+        if not self.current_tree or not self.focused_workspace_name:
+            return
+
+        ws_node = self.find_node_by_name(self.current_tree, self.focused_workspace_name)
+
+        if ws_node:
+            w_width = widget.get_allocated_width()
+            w_height = widget.get_allocated_height()
+            
+            avail_y = 5 # Default small padding
+            
+            # Header Breadcrumbs (Only in Window mode)
+            if self.mode == "window":
+                path = self.get_node_path(self.current_tree, ws_node.id)
+                path_str = " > ".join([n.name or n.type for n in path]) if path else "Root"
+                
+                ctx.save()
+                ctx.set_source_rgb(0.8, 0.8, 0.8)
+                ctx.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
+                ctx.set_font_size(12)
+                ctx.move_to(10, 20)
+                ctx.show_text(path_str)
+                ctx.restore()
+                
+                avail_y = 30
+            
+            # Available area for the tree
+            avail_h = w_height - avail_y - 10
+            avail_w = w_width - 20
+            
+            # Aspect Ratio Correction
+            # Get actual workspace geometry
+            ws_rect = ws_node.rect
+            if ws_rect.width and ws_rect.height:
+                ws_ratio = ws_rect.width / ws_rect.height
+                win_ratio = avail_w / avail_h
+                
+                final_w = avail_w
+                final_h = avail_h
+                
+                if ws_ratio > win_ratio:
+                    # Workspace is wider than window: constrain by width
+                    final_h = avail_w / ws_ratio
+                else:
+                    # Workspace is taller than window: constrain by height
+                    final_w = avail_h * ws_ratio
+                
+                # Center it
+                offset_x = 10 + (avail_w - final_w) / 2
+                offset_y = avail_y + (avail_h - final_h) / 2
+                
+                self.draw_node_recursive(ctx, ws_node, offset_x, offset_y, final_w, final_h)
+            else:
+                # Fallback if no geometry info
+                self.draw_node_recursive(ctx, ws_node, 10, avail_y, avail_w, avail_h)
+
+    def draw_node_recursive(self, ctx, node, x, y, w, h):
+        if w <= 0 or h <= 0: return
+
         is_leaf = len(node.nodes) == 0
         
-        # Colors
+        # Colors (Polished)
+        border_color = (0.3, 0.3, 0.3)
+        border_width = 1
+        bg_color = (0.1, 0.1, 0.1, 1.0) # Dark background for containers
+
         if node.focused:
-            ctx.set_source_rgb(0.2, 0.6, 1.0) # Blue highlight
-            ctx.set_line_width(4)
-        else:
-            ctx.set_source_rgb(0.3, 0.3, 0.3) # Grey
-            ctx.set_line_width(2)
-            
-        if is_leaf:
-            # Fill leaf
-            if node.focused:
-                ctx.set_source_rgba(0.2, 0.6, 1.0, 0.4)
-            else:
-                ctx.set_source_rgba(0.3, 0.3, 0.3, 0.4)
-            ctx.rectangle(r.x, r.y, r.width, r.height)
-            ctx.fill_preserve()
-            
-            # Border
-            if node.focused:
-                 ctx.set_source_rgb(0.2, 0.6, 1.0)
-            else:
-                 ctx.set_source_rgb(0.5, 0.5, 0.5)
-            ctx.stroke()
-        else:
-            # Draw container border (thinner)
-            ctx.set_source_rgba(0.4, 0.4, 0.4, 0.2)
-            ctx.rectangle(r.x, r.y, r.width, r.height)
-            ctx.stroke()
-            
-            # Layout Indicator
-            if node.layout in ['tabbed', 'stacked']:
-                ctx.save()
-                ctx.set_source_rgb(1.0, 1.0, 1.0)
-                ctx.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
-                # Scale font size inversely to current scale to keep text readable constant size? 
-                # No, just pick a reasonable size relative to coordinates.
-                # Since we scaled the context, 20 units might be huge or tiny depending on screen res.
-                # Assuming 1080p workspace, 20px is small.
-                ctx.set_font_size(30)
-                ctx.move_to(r.x + 10, r.y + 40)
-                label = "T" if node.layout == 'tabbed' else "S"
-                ctx.show_text(label)
-                ctx.restore()
+            border_color = (0.3, 0.7, 1.0) # Soft Blue
+            border_width = 2
+            bg_color = (0.1, 0.2, 0.3, 1.0) # Dark Blue tint
+        elif is_leaf:
+            bg_color = (0.18, 0.18, 0.18, 1.0) # Slightly lighter for windows
 
-        # Recurse
-        for child in node.nodes:
-            self.draw_node(ctx, child)
+        # 1. Draw Background (Bottom Layer)
+        ctx.save()
+        ctx.rectangle(x, y, w, h)
+        ctx.set_source_rgba(*bg_color)
+        ctx.fill() # Only fill
+        ctx.restore()
+
+        # Determine Label
+        label = ""
+        if node.type == 'workspace':
+            label = f"WS: {node.name}"
+        elif node.type == 'con':
+            if is_leaf:
+                label = node.name if node.name else "unnamed"
+            else:
+                label = f"{node.layout}"
+        elif node.type == 'floating_con':
+            label = "Float"
         
-        # Floating nodes (drawn on top)
-        for child in node.floating_nodes:
-            self.draw_node(ctx, child)
+        # 2. Draw Header Label (Middle Layer A)
+        # Use a dynamic header height based on size, but clamped
+        
+        # FIX: If the node is very small (likely a tab or collapsed stack item),
+        # force the header to fill the space so text is visible.
+        if h < HEADER_H * 1.5:
+             header_h = h - 2 # Use almost full height
+        else:
+             header_h = min(HEADER_H, h * 0.3) 
+        
+        if header_h > 8: # Only draw header if space permits
+            ctx.save()
+            ctx.rectangle(x, y, w, header_h)
+            ctx.clip()
+            
+            # Text Color
+            text_color = (0.7, 0.7, 0.7)
+            if node.focused: text_color = (1.0, 1.0, 1.0)
+            
+            # Center vertically in the header strip
+            ctx.move_to(x + 4, y + (header_h / 2) + 4) 
+            
+            ctx.set_source_rgb(*text_color)
+            ctx.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
+            ctx.set_font_size(min(10, header_h - 2))
+            ctx.show_text(label)
+            ctx.restore()
 
+        # Calculate Content Area for Children
+        # If header was too small, don't reserve space for it
+        effective_header_h = header_h if header_h > 8 else 0
+        
+        # If this is a "Collapsed" view (header takes up most space), don't draw content
+        if h < HEADER_H * 1.5:
+            effective_header_h = h # Consume all space
+        
+        cx = x + PAD
+        cy = y + effective_header_h
+        cw = w - (2 * PAD)
+        ch = h - effective_header_h - PAD
+
+        if cw > 0 and ch > 0:
+            # 3. Recurse for Children (Middle Layer B)
+            if not is_leaf:
+                children = node.nodes
+                count = len(children)
+                if count > 0:
+                    # Layout Logic
+                    if node.layout in ['splith', 'splitv']:
+                        # Calculate total size in Sway units to determine ratios
+                        # Note: node.rect might not exactly match sum of children due to borders/gaps in sway
+                        # So we sum children.
+                        total_sway_size = 0
+                        if node.layout == 'splith':
+                            total_sway_size = sum(c.rect.width for c in children)
+                        else:
+                            total_sway_size = sum(c.rect.height for c in children)
+                        
+                        if total_sway_size == 0: total_sway_size = 1 # avoid div/0
+
+                        curr_pos = 0
+                        for child in children:
+                            ratio = 0
+                            if node.layout == 'splith':
+                                ratio = child.rect.width / total_sway_size
+                                child_w = cw * ratio
+                                self.draw_node_recursive(ctx, child, cx + curr_pos, cy, child_w, ch)
+                                curr_pos += child_w
+                            else: # splitv
+                                ratio = child.rect.height / total_sway_size
+                                child_h = ch * ratio
+                                self.draw_node_recursive(ctx, child, cx, cy + curr_pos, cw, child_h)
+                                curr_pos += child_h
+
+                    elif node.layout in ['tabbed', 'stacked']:
+                        # Identify Active Child
+                        active_child = None
+                        if node.focus:
+                            active_id = node.focus[0]
+                            active_child = next((c for c in children if c.id == active_id), children[0])
+                        else:
+                            active_child = children[0]
+
+                        TAB_SIZE = 22 # Height of headers
+                        
+                        if node.layout == 'tabbed':
+                            # TABBED: Top Horizontal Strip for Headers + Main Area for Active Content
+                            tab_w = cw / count
+                            
+                            # 1. Draw All Tabs (Inactive headers)
+                            # We draw the active tab here too as a marker?
+                            # Yes, draw all as headers in the strip.
+                            for i, child in enumerate(children):
+                                tx = cx + (i * tab_w)
+                                ty = cy
+                                tw = tab_w
+                                th = TAB_SIZE
+                                
+                                if child == active_child:
+                                    # Highlight Active Tab
+                                    ctx.save()
+                                    ctx.rectangle(tx, ty, tw, th)
+                                    ctx.set_source_rgb(0.2, 0.6, 1.0) # Blue
+                                    ctx.fill()
+                                    # Add label explicitly? No, draw_node_recursive below will handle frame/label if we call it.
+                                    # But we want to draw the BODY primarily.
+                                    # Let's draw a "Tab Marker" here.
+                                    ctx.restore()
+                                else:
+                                    # Draw Inactive Tab (Recurse -> renders frame/header)
+                                    self.draw_node_recursive(ctx, child, tx, ty, tw, th)
+
+                            # 2. Draw Active Body
+                            body_y = cy + TAB_SIZE
+                            body_h = ch - TAB_SIZE
+                            if body_h > 0:
+                                self.draw_node_recursive(ctx, active_child, cx, body_y, cw, body_h)
+
+                        else: 
+                            # STACKED: Accordion (Vertical List)
+                            # Inactive get Header height. Active gets remaining.
+                            
+                            inactive_count = count - 1
+                            req_header_space = inactive_count * TAB_SIZE
+                            
+                            # Header height for inactive nodes
+                            h_h = TAB_SIZE
+                            if req_header_space > ch * 0.6: # If headers take > 60% of space, compress
+                                h_h = (ch * 0.6) / inactive_count if inactive_count > 0 else TAB_SIZE
+
+                            curr_y = cy
+                            for child in children:
+                                if child == active_child:
+                                    # Active gets remaining space
+                                    rem_h = ch - (inactive_count * h_h)
+                                    self.draw_node_recursive(ctx, child, cx, curr_y, cw, rem_h)
+                                    curr_y += rem_h
+                                else:
+                                    # Inactive gets header space
+                                    self.draw_node_recursive(ctx, child, cx, curr_y, cw, h_h)
+                                    curr_y += h_h
+
+            # Floating nodes (on top of children but under border?) 
+            # Actually floating nodes should be on top of everything usually.
+            # But strictly they are children of the container. 
+            # Drawing them here means they are "inside" the container border.
+            for child in node.floating_nodes:
+                fw = w * 0.5
+                fh = h * 0.5
+                fx = x + (w - fw) / 2
+                fy = y + (h - fh) / 2
+                self.draw_node_recursive(ctx, child, fx, fy, fw, fh)
+
+        # 4. Draw Border (Top Layer - Ensures Focus is Visible)
+        ctx.save()
+        ctx.rectangle(x, y, w, h)
+        ctx.set_source_rgb(*border_color)
+        ctx.set_line_width(border_width)
+        ctx.stroke()
+        ctx.restore()
