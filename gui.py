@@ -10,6 +10,7 @@ HEADER_H = 20
 class TreeVisualizer(Gtk.Window):
     def __init__(self, mode="window", include_floating=False, alpha=0.5, width="100%", height="100%"):
         super().__init__(title="SwayTreeViewer")
+        self.set_wmclass("swaytreeviewer", "SwayTreeViewer")
         self.mode = mode
         self.include_floating = include_floating
         self.alpha = alpha
@@ -34,6 +35,12 @@ class TreeVisualizer(Gtk.Window):
 
         # Make the window floating and sticky via hints (for utility windows)
         self.set_type_hint(Gdk.WindowTypeHint.UTILITY)
+        
+        # Prevent window from stealing focus on start
+        self.set_focus_on_map(False)
+        
+        # Handle key press events
+        self.connect("key-press-event", self.on_key_press)
         
         self.drawing_area = Gtk.DrawingArea()
         self.drawing_area.connect("draw", self.on_draw)
@@ -92,6 +99,13 @@ class TreeVisualizer(Gtk.Window):
             if path:
                 return [root] + path
         return None
+
+    def on_key_press(self, widget, event):
+        """Handle key press events."""
+        if event.keyval == Gdk.KEY_Escape:
+            self.destroy()
+            return True
+        return False
 
     def on_draw(self, widget, ctx):
         # 1. Clear/Draw Window Background

@@ -5,8 +5,10 @@ A Python application that visualizes the Sway window manager layout tree in real
 ## Requirements
 
 *   Python 3
-*   GTK 3 (usually installed by default on most Linux distributions)
+*   GTK 3
 *   Sway Window Manager
+
+All three are typically installed by default if you're using Sway.
 
 ## Installation
 
@@ -19,12 +21,36 @@ A Python application that visualizes the Sway window manager layout tree in real
 You might face some dependency errors which require you to run `pip install -r requirements.txt` but that is unlikely as the only two dependencies are i3ipc and PyGObject which are installed by default when using SwayWM.
 
 
+Pip installation coming soon.
+
 ## Usage
 
-You can start the application by running main.py
+You start the application by running main.py
 
 ```
 python3 main.py
+
+# OR
+
+python3 main.py --mode transparent
+```
+
+
+The first option launches it as a standard window within sway's tiling. 
+
+![Sway Tree Viewer Screenshot](docs/screenshot-window.png)
+
+The second option launches it as a transparent overlay over your screen.
+
+The application has a built-in "Toggle" feature:
+1.  **Does Not Steal Focus:** When launched, it appears without taking focus, allowing you to keep focus on your regular windows and moving them.
+2.  **Toggle behavior:** If you press the hotkey again, it closes the existing window (regardless of which window is focused).
+
+Add this line to your Sway config (e.g., `~/.config/sway/config`):
+
+```bash
+# Toggle SwayTreeViewer with Mod+t
+bindsym $mod+t exec python3 /path/to/swaytreeviewer/main.py --mode transparent
 ```
 
 ## Command Line Options
@@ -35,7 +61,7 @@ The application supports different display modes to suit your workflow.
 
 Controls how the application window is displayed.
 
-*   **Syntax:** `python3 --mode <MODE>`
+*   **Syntax:** `python3 main.py --mode <MODE>`
 *   **Default:** `window`
 
 **Available Modes:**
@@ -45,9 +71,9 @@ Controls how the application window is displayed.
 
 **Examples:**
 
-Run in floating mode:
+Run in floating mode (default):
 ```python
-python3 main.py --mode floating
+python3 main.py --mode window
 ```
 
 Run as a transparent overlay:
@@ -74,13 +100,13 @@ Sets the opacity of the visualization elements (backgrounds, borders, text). Thi
 
 *   **Syntax:** `python3 main.py --alpha <VALUE>`
 *   **Value:** A float between `0.0` (fully transparent) and `1.0` (fully opaque).
-*   **Default:** `1.0`
+*   **Default:** `0.5`
 
 **Example:**
 
-Run with 50% opacity:
+Run with 10% opacity:
 ```python
-python3 main.py --mode transparent --alpha 0.5
+python3 main.py --mode transparent --alpha 0.1
 ```
 
 ### `--width` and `--height`
